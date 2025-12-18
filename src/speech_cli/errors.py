@@ -11,7 +11,7 @@ class SpeechCLIError(Exception):
     exit_code: ExitCode = ExitCode.GENERAL_ERROR
 
     def __init__(self, message: str, details: Optional[str] = None) -> None:
-        """Initialize the exception.
+        """Initialise the exception.
 
         Args:
             message: The error message
@@ -64,7 +64,7 @@ class AuthenticationError(APIError):
     def __init__(
         self, message: str = "Authentication failed", details: Optional[str] = None
     ) -> None:
-        """Initialize authentication error with default message."""
+        """Initialise authentication error with default message."""
         super().__init__(message, details)
 
 
@@ -74,5 +74,5 @@ class RateLimitError(APIError):
     def __init__(
         self, message: str = "API rate limit exceeded", details: Optional[str] = None
     ) -> None:
-        """Initialize rate limit error with default message."""
+        """Initialise rate limit error with default message."""
         super().__init__(message, details)

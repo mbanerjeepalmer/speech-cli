@@ -57,8 +57,8 @@ def transcribe_audio(
     api_key_resolved = get_api_key(api_key)
     validate_api_key(api_key_resolved)
 
-    # Initialize client
-    print("Initializing client...", file=sys.stderr)
+    # Initialise client
+    print("Initialising client...", file=sys.stderr)
     client = TranscriptionClient(api_key_resolved)
 
     # Transcribe

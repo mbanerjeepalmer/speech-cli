@@ -25,7 +25,7 @@ class TranscriptionClient:
     """Wrapper around ElevenLabs client with retry logic and error handling."""
 
     def __init__(self, api_key: str, timeout: int = REQUEST_TIMEOUT) -> None:
-        """Initialize the transcription client.
+        """Initialise the transcription client.
 
         Args:
             api_key: ElevenLabs API key

@@ -70,7 +70,7 @@ def transcribe(
     no_color: bool = typer.Option(
         False,
         "--no-color",
-        help="Disable colored output",
+        help="Disable coloured output",
     ),
     version: Optional[bool] = typer.Option(
         None,

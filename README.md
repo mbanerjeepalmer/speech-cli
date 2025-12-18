@@ -9,7 +9,7 @@ A command-line tool for transcribing audio files using the ElevenLabs API.
 - 🔑 Flexible API key management (CLI, environment variable, or .env file)
 - 🌍 Language specification support
 - 💾 Save output to files or stdout
-- 🎨 Colored terminal output (optional)
+- 🎨 Coloured terminal output (optional)
 - 🔄 Automatic retry logic for network errors
 - ✅ Comprehensive input validation
 
@@ -106,7 +106,7 @@ Use a specific model:
 speech-cli audio.mp3 --model scribe_v1_experimental
 ```
 
-Disable colored output:
+Disable coloured output:
 
 ```bash
 speech-cli audio.mp3 --no-color
@@ -126,7 +126,7 @@ Options:
   -k, --api-key TEXT      ElevenLabs API key
   -l, --language TEXT     ISO 639-1 language code (e.g., 'en', 'es', 'fr')
   -m, --model TEXT        Model to use for transcription [default: scribe_v1]
-  --no-color              Disable colored output
+  --no-color              Disable coloured output
   -v, --version           Show version and exit
   --help                  Show this message and exit
 ```
