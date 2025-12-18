@@ -2,7 +2,9 @@
 
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 from elevenlabs import ElevenLabs
 from elevenlabs.core import ApiError
@@ -35,14 +37,14 @@ class TranscriptionClient:
 
     def transcribe(
         self,
-        audio_file: Path,
+        audio_file: Union[Path, str],
         language: Optional[str] = None,
         model_id: str = "scribe_v1",
     ) -> Dict[str, Any]:
         """Transcribe an audio file.
 
         Args:
-            audio_file: Path to the audio file
+            audio_file: Path to the audio file or URL
             language: Optional ISO 639-1 language code
             model_id: The model to use for transcription
 
@@ -60,14 +62,29 @@ class TranscriptionClient:
 
         while attempt < MAX_RETRIES:
             try:
-                # Open the file in binary mode
-                with open(audio_file, "rb") as f:
-                    # Call the speech-to-text API
-                    result = self.client.speech_to_text.convert(
-                        model_id=model_id,
-                        file=f,
-                        language_code=language if language else None,
-                    )
+                # Check if audio_file is a URL or local path
+                is_url = isinstance(audio_file, str) and urlparse(audio_file).scheme in ('http', 'https')
+
+                if is_url:
+                    # Download from URL
+                    with urlopen(audio_file) as response:
+                        audio_data = response.read()
+                        # Call the speech-to-text API with binary data
+                        from io import BytesIO
+                        result = self.client.speech_to_text.convert(
+                            model_id=model_id,
+                            file=BytesIO(audio_data),
+                            language_code=language if language else None,
+                        )
+                else:
+                    # Open local file in binary mode
+                    with open(audio_file, "rb") as f:
+                        # Call the speech-to-text API
+                        result = self.client.speech_to_text.convert(
+                            model_id=model_id,
+                            file=f,
+                            language_code=language if language else None,
+                        )
 
                 # Convert the response to a dictionary
                 return self._process_response(result)
@@ -103,8 +120,8 @@ class TranscriptionClient:
                     details=f"Status code: {status_code}" if status_code else None,
                 ) from e
 
-            except (ConnectionError, TimeoutError) as e:
-                # Network errors - retry
+            except (ConnectionError, TimeoutError, OSError) as e:
+                # Network errors - retry (includes URLError from urlopen)
                 last_error = e
                 attempt += 1
                 if attempt < MAX_RETRIES:

@@ -1,7 +1,8 @@
 """Input validation for speech-cli."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
+from urllib.parse import urlparse
 
 from speech_cli.constants import (
     MAX_FILE_SIZE_MB,
@@ -11,18 +12,32 @@ from speech_cli.constants import (
 from speech_cli.errors import ValidationError
 
 
-def validate_audio_file(file_path: str) -> Path:
+def validate_audio_file(file_path: str) -> Union[Path, str]:
     """Validate that the audio file exists and is valid.
 
     Args:
-        file_path: Path to the audio file
+        file_path: Path to the audio file or URL
 
     Returns:
-        Path object for the validated file
+        Path object for local files or URL string for remote files
 
     Raises:
         ValidationError: If the file is invalid
     """
+    # Check if it's a URL
+    parsed = urlparse(file_path)
+    if parsed.scheme in ('http', 'https'):
+        # Validate URL has a supported audio extension
+        path_lower = parsed.path.lower()
+        if not any(path_lower.endswith(ext) for ext in SUPPORTED_AUDIO_EXTENSIONS):
+            raise ValidationError(
+                f"Unsupported URL file format",
+                details=f"URL must point to a file with one of these extensions: {', '.join(SUPPORTED_AUDIO_EXTENSIONS)}",
+            )
+        # Return the URL as-is for remote handling
+        return file_path
+
+    # Handle local file path
     path = Path(file_path)
 
     # Check if file exists

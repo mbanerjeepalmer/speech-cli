@@ -62,7 +62,16 @@ def transcribe_audio(
     client = TranscriptionClient(api_key_resolved)
 
     # Transcribe
-    print(f"Transcribing {audio_path.name}...", file=sys.stderr)
+    # Get filename for display
+    if isinstance(audio_path, Path):
+        display_name = audio_path.name
+    else:
+        # URL - extract filename from path
+        from urllib.parse import urlparse
+        parsed = urlparse(audio_path)
+        display_name = parsed.path.split('/')[-1] or audio_path
+
+    print(f"Transcribing {display_name}...", file=sys.stderr)
     result = client.transcribe(
         audio_file=audio_path,
         language=language_validated,

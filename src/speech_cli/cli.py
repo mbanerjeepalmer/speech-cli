@@ -33,7 +33,7 @@ def version_callback(value: bool) -> None:
 def transcribe(
     audio_file: str = typer.Argument(
         ...,
-        help="Path to the audio file to transcribe",
+        help="Path to the audio file or URL to transcribe",
         metavar="AUDIO_FILE",
     ),
     output_format: str = typer.Option(
@@ -81,12 +81,15 @@ def transcribe(
         is_eager=True,
     ),
 ) -> None:
-    """Transcribe an audio file using the ElevenLabs API.
+    """Transcribe an audio file or URL using the ElevenLabs API.
 
     Example usage:
 
-        # Transcribe to text (default)
+        # Transcribe local file to text (default)
         speech-cli audio.mp3
+
+        # Transcribe from URL
+        speech-cli https://example.com/audio.mp3
 
         # Transcribe to JSON format
         speech-cli audio.mp3 --format json
@@ -123,18 +126,18 @@ def transcribe(
 
     except SpeechCLIError as e:
         # Handle our custom errors
-        console.print(f"[red]Error:[/red] {e.message}", stderr=True)
+        console.print(f"[red]Error:[/red] {e.message}", file=sys.stderr)
         if e.details:
-            console.print(e.details, stderr=True)
+            console.print(e.details, file=sys.stderr)
         sys.exit(e.exit_code.value)
 
     except KeyboardInterrupt:
-        console.print("\n[yellow]Interrupted by user[/yellow]", stderr=True)
+        console.print("\n[yellow]Interrupted by user[/yellow]", file=sys.stderr)
         sys.exit(130)
 
     except Exception as e:
         # Unexpected errors
-        console.print(f"[red]Unexpected error:[/red] {str(e)}", stderr=True)
+        console.print(f"[red]Unexpected error:[/red] {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 
