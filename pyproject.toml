@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-speech-cli = "speech_cli.cli:app"
+speech-cli = "speech_cli.__main__:main"
 
 [project.optional-dependencies]
 dev = [

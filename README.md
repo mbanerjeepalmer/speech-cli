@@ -20,7 +20,8 @@ A command-line tool for transcribing audio files using the ElevenLabs API.
 Run without installation:
 
 ```bash
-uvx --from git+https://github.com/yourusername/speech-cli speech-cli audio.mp3
+uvx --from git+https://github.com/mbanerjeepalmer/speech-cli speech-cli https://dn720704.ca.archive.org/0/items/mlswc037_2502_librivox/msw037_01_porarhishab_ray_dck_128kb.mp3
+
 ```
 
 ### Using pip
@@ -32,7 +33,7 @@ pip install speech-cli
 ### From source
 
 ```bash
-git clone https://github.com/yourusername/speech-cli
+git clone https://github.com/mbanerjeepalmer/speech-cli
 cd speech-cli
 uv sync
 uv run speech-cli audio.mp3
@@ -202,7 +203,7 @@ The tool provides clear error messages with specific exit codes:
 ### Setup
 
 ```bash
-git clone https://github.com/yourusername/speech-cli
+git clone https://github.com/mbanerjeepalmer/speech-cli
 cd speech-cli
 uv sync --extra dev
 ```
