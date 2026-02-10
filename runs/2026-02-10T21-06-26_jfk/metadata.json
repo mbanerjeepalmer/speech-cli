@@ -1,0 +1,7 @@
+{
+  "created": "2026-02-10T21:06:26.474041",
+  "audio_file": "/home/mbp/Dropbox/Projects/whisper.cpp/samples/jfk.wav",
+  "providers": [
+    "whisper-cpp"
+  ]
+}

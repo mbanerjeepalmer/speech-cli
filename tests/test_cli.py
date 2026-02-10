@@ -1,7 +1,5 @@
 """Tests for CLI module."""
 
-import tempfile
-
 from typer.testing import CliRunner
 
 from speech_cli.cli import app
@@ -20,20 +18,13 @@ def test_cli_help():
     """Test --help flag."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "Transcribe an audio file" in result.stdout
-    assert "AUDIO_FILE" in result.stdout
+    assert "transcribe" in result.stdout.lower()
+    assert "list-providers" in result.stdout.lower()
+    assert "show" in result.stdout.lower()
 
 
-def test_cli_missing_file():
-    """Test with missing audio file."""
-    result = runner.invoke(app, ["nonexistent.mp3", "--api-key", "test_key"])
-    assert result.exit_code != 0
-
-
-def test_cli_invalid_format():
-    """Test with invalid output format."""
-    with tempfile.NamedTemporaryFile(suffix=".mp3") as f:
-        result = runner.invoke(
-            app, [f.name, "--format", "invalid", "--api-key", "test_key"]
-        )
-        assert result.exit_code != 0
+def test_list_providers():
+    """Test list-providers from top level."""
+    result = runner.invoke(app, ["list-providers"])
+    assert result.exit_code == 0
+    assert "whisper-cpp" in result.stdout

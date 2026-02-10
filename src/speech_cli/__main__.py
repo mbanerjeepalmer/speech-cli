@@ -1,40 +1,18 @@
-"""Main entry point for speech-cli with dynamic CLI generation."""
+"""Main entry point for speech-cli."""
 
 import sys
-from pathlib import Path
 
 from rich.console import Console
 
-# Console for stderr output
 console = Console(stderr=True)
 
 
 def main() -> None:
-    """Main entry point - dynamically generate CLI from SDK."""
+    """Main entry point."""
     try:
-        # Check if SDK methods file exists
-        sdk_methods_path = (
-            Path(__file__).parent.parent.parent / "docs" / "sdk-methods.json"
-        )
+        from speech_cli.cli import app
 
-        if sdk_methods_path.exists():
-            # Use dynamic CLI generator
-            from speech_cli.cli_generator import get_cli_app
-
-            app = get_cli_app()
-            app()
-        else:
-            # Fallback to legacy CLI
-            console.print("[yellow]Warning:[/yellow] SDK methods data not found")
-            console.print("Falling back to legacy CLI (STT only)")
-            console.print(
-                "To enable full SDK access, run: uv run python scripts/inspect_sdk.py"
-            )
-            console.print("")
-
-            from speech_cli.cli import app as legacy_app
-
-            legacy_app()
+        app()
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted by user[/yellow]")

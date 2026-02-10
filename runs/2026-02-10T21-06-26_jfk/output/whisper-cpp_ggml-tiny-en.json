@@ -1,0 +1,26 @@
+{
+  "task": "transcribe",
+  "language": "en",
+  "text": "And so my fellow Americans ask not what your country can do for you ask what you can do for your country.",
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 7.96,
+      "text": "And so my fellow Americans ask not what your country can do for you",
+      "speaker": null,
+      "confidence": null
+    },
+    {
+      "id": 1,
+      "start": 7.96,
+      "end": 10.76,
+      "text": "ask what you can do for your country.",
+      "speaker": null,
+      "confidence": null
+    }
+  ],
+  "provider": "whisper-cpp",
+  "model": "ggml-tiny.en",
+  "processing_time_seconds": 1.065
+}
