@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 
 @dataclass
@@ -57,3 +57,23 @@ class TranscriptionProvider(ABC):
     def supports_diarization(self) -> bool:
         """Whether this provider supports speaker diarization."""
         return False
+
+
+class StreamingTranscriptionProvider(TranscriptionProvider):
+    """Provider that supports real-time audio streaming."""
+
+    @abstractmethod
+    def start_streaming(self) -> None:
+        """Open the streaming connection."""
+
+    @abstractmethod
+    def send_audio(self, chunk: bytes) -> None:
+        """Send a chunk of PCM 16kHz mono int16 audio."""
+
+    @abstractmethod
+    def stop_streaming(self) -> TranscriptionResult:
+        """Close the connection and return the final result."""
+
+    @abstractmethod
+    def on_partial(self, callback: Callable[[str], None]) -> None:
+        """Register callback for partial transcript text updates."""

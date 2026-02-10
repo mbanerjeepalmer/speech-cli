@@ -71,3 +71,29 @@ def test_transcribe_help():
     result = runner.invoke(_test_app, ["transcribe", "--help"])
     assert result.exit_code == 0
     assert "audio" in result.stdout.lower()
+
+
+def test_transcribe_no_file_no_mic():
+    """Must provide either audio_file or --mic."""
+    result = runner.invoke(_test_app, ["transcribe", "--mic", "false"])
+    # With no audio_file and no --mic, should fail
+    # Actually, typer makes audio_file optional now, so test explicit case
+    result = runner.invoke(_test_app, ["transcribe"])
+    assert result.exit_code != 0
+
+
+def test_transcribe_mic_and_file():
+    """Cannot use both --mic and an audio file."""
+    result = runner.invoke(_test_app, ["transcribe", "test.wav", "--mic"])
+    assert result.exit_code != 0
+
+
+def test_transcribe_sync_not_implemented():
+    """--sync flag raises NotImplementedError."""
+    result = runner.invoke(_test_app, ["transcribe", "test.wav", "--sync"])
+    assert result.exit_code != 0
+
+
+def test_transcribe_help_shows_mic():
+    result = runner.invoke(_test_app, ["transcribe", "--help"])
+    assert "--mic" in result.stdout

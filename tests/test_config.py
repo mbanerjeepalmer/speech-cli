@@ -23,9 +23,10 @@ def test_get_api_key_from_env_var(monkeypatch):
     assert api_key == "env_key"
 
 
-def test_get_api_key_not_found(monkeypatch):
+def test_get_api_key_not_found(monkeypatch, tmp_path):
     """Test that missing API key raises ConfigurationError."""
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
     with pytest.raises(ConfigurationError, match="API key not found"):
         get_api_key()
 

@@ -7,7 +7,12 @@ from typing import Optional
 
 from rich.console import Console
 
-from speech_cli.eval.providers.base import TranscriptionProvider, TranscriptionResult
+from speech_cli.eval.audio.chunked_adapter import ChunkedStreamingAdapter
+from speech_cli.eval.providers.base import (
+    StreamingTranscriptionProvider,
+    TranscriptionProvider,
+    TranscriptionResult,
+)
 from speech_cli.eval.providers.registry import get_provider, parse_provider_spec
 from speech_cli.eval.storage.eval_run import TranscriptionRun
 from speech_cli.eval.storage.formats import result_to_verbose_json
@@ -123,3 +128,55 @@ def run_parallel(
                 console.print(f"[red]{spec} failed:[/red] {e}")
 
     return tr_run, results
+
+
+def run_streaming(
+    provider_specs: list[str],
+    base_dir: Optional[Path] = None,
+    partial_callback=None,
+) -> tuple[list, "Callable[[bytes], None]", "Callable[[], list[TranscriptionResult]]"]:
+    """Set up streaming providers and return audio sink + stop function.
+
+    Args:
+        provider_specs: List of provider spec strings.
+        base_dir: Base directory for runs.
+        partial_callback: Optional callback(provider_name, text) for partial updates.
+
+    Returns:
+        Tuple of (streaming_adapters, on_audio_fn, stop_fn).
+        - streaming_adapters: list of adapters (for reference)
+        - on_audio_fn: call with audio bytes to fan out to all providers
+        - stop_fn: call to stop all providers and get final results
+    """
+    adapters = []
+    for spec in provider_specs:
+        name, config = parse_provider_spec(spec)
+        provider = get_provider(name, config)
+        provider.validate_config()
+
+        if isinstance(provider, StreamingTranscriptionProvider):
+            adapter = provider
+        else:
+            adapter = ChunkedStreamingAdapter(provider)
+
+        if partial_callback:
+            adapter.on_partial(lambda text, n=name: partial_callback(n, text))
+
+        adapter.start_streaming()
+        adapters.append((spec, adapter))
+
+    def on_audio(chunk: bytes) -> None:
+        for _, adapter in adapters:
+            adapter.send_audio(chunk)
+
+    def stop() -> list[TranscriptionResult]:
+        results = []
+        for spec, adapter in adapters:
+            try:
+                result = adapter.stop_streaming()
+                results.append(result)
+            except Exception as e:
+                console.print(f"[red]{spec} stop failed:[/red] {e}")
+        return results
+
+    return adapters, on_audio, stop

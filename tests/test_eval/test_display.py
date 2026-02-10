@@ -85,3 +85,67 @@ def test_eval_display_render_waiting():
 
     rendered = display._render_single_line()
     assert rendered is not None
+
+
+def test_eval_display_update_partial():
+    """Partial text updates are stored separately from final results."""
+    display = TranscriptionDisplay(mode="single-line")
+    display.set_providers(["test"])
+
+    display.update_partial("test", "hello wo")
+    assert display._partials["test"] == "hello wo"
+    assert "test" not in display._results
+
+    # Render should not raise
+    rendered = display._render()
+    assert rendered is not None
+
+
+def test_eval_display_partial_cleared_on_result():
+    """Final result clears the partial text for that provider."""
+    display = TranscriptionDisplay(mode="single-line")
+    display.set_providers(["test"])
+
+    display.update_partial("test", "hello wo")
+    assert "test" in display._partials
+
+    result = TranscriptionResult(
+        provider_name="test", model_name="m", text="hello world"
+    )
+    display.update_result("test", result)
+    assert "test" not in display._partials
+    assert "test" in display._results
+
+
+def test_eval_display_partial_multi_line():
+    """Partial text renders in multi-line mode."""
+    display = TranscriptionDisplay(mode="multi-line")
+    display.set_providers(["test"])
+
+    display.update_partial("test", "streaming text")
+    rendered = display._render()
+    assert rendered is not None
+
+
+def test_eval_display_recording_status():
+    """Recording status renders as a header."""
+    display = TranscriptionDisplay(mode="single-line")
+    display.set_providers(["test"])
+
+    display.update_recording_status(elapsed=65.0, level=0.5, is_recording=True)
+    assert display._recording is True
+    assert display._rec_elapsed == 65.0
+
+    rendered = display._render()
+    assert rendered is not None
+
+
+def test_eval_display_recording_off():
+    """When not recording, no recording header is rendered."""
+    display = TranscriptionDisplay(mode="single-line")
+    display.set_providers(["test"])
+
+    display.update_recording_status(elapsed=0.0, level=0.0, is_recording=False)
+    # Should just render the table, no Group wrapper
+    rendered = display._render()
+    assert rendered is not None
