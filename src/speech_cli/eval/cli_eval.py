@@ -53,6 +53,18 @@ def register_commands(app: typer.Typer) -> None:
             "--max-duration",
             help="Maximum recording duration in seconds (mic mode).",
         ),
+        name: Optional[str] = typer.Option(
+            None,
+            "--name",
+            "-n",
+            help="Optional name for this run.",
+        ),
+        gain: float = typer.Option(
+            1.0,
+            "--gain",
+            "-g",
+            help="Mic input gain multiplier (e.g. 2.0 for 2x louder).",
+        ),
         sync: bool = typer.Option(
             False,
             "--sync",
@@ -67,16 +79,15 @@ def register_commands(app: typer.Typer) -> None:
             console.print("[red]Error:[/red] Cannot use both --mic and an audio file.")
             raise typer.Exit(code=1)
 
-        if not mic and not audio_file:
-            console.print("[red]Error:[/red] Provide an audio file or use --mic.")
-            raise typer.Exit(code=1)
+        # Default to mic mode when no audio file provided
+        use_mic = mic or not audio_file
 
         base_dir = Path(output_dir) if output_dir else None
 
-        if mic:
-            _run_mic_mode(provider, display, base_dir, max_duration)
+        if use_mic:
+            _run_mic_mode(provider, display, base_dir, max_duration, name=name, gain=gain)
         elif len(provider) == 1:
-            tr_run, result = run_single(audio_file, provider[0], base_dir=base_dir)
+            tr_run, result = run_single(audio_file, provider[0], base_dir=base_dir, run_name=name)
             _print_result(result)
             console.print(f"\n[dim]Run: {tr_run.run_dir}[/dim]")
         else:
@@ -85,8 +96,8 @@ def register_commands(app: typer.Typer) -> None:
             tr_display = TranscriptionDisplay(mode=display)
             provider_names = []
             for spec in provider:
-                name, _ = parse_provider_spec(spec)
-                provider_names.append(name)
+                pname, _ = parse_provider_spec(spec)
+                provider_names.append(pname)
             tr_display.set_providers(provider_names)
 
             def on_result(provider_name, result):
@@ -98,6 +109,7 @@ def register_commands(app: typer.Typer) -> None:
                     provider,
                     base_dir=base_dir,
                     display_callback=on_result,
+                    run_name=name,
                 )
 
             console.print(f"\n[dim]Run: {tr_run.run_dir}[/dim]")
@@ -160,23 +172,33 @@ def _run_mic_mode(
     display_mode: str,
     base_dir: Optional[Path],
     max_duration: float,
+    name: Optional[str] = None,
+    gain: float = 1.0,
 ) -> None:
     """Run live mic recording with streaming transcription."""
     from speech_cli.eval.audio.recorder import MicRecorder
     from speech_cli.eval.display.live_display import TranscriptionDisplay
+    from speech_cli.eval.storage.formats import result_to_verbose_json
 
     provider_names = []
     for spec in provider_specs:
-        name, _ = parse_provider_spec(spec)
-        provider_names.append(name)
+        pname, _ = parse_provider_spec(spec)
+        provider_names.append(pname)
 
     tr_display = TranscriptionDisplay(mode=display_mode)
     tr_display.set_providers(provider_names)
 
+    # Create run directory before recording (no audio file yet)
+    tr_run = TranscriptionRun(
+        providers=provider_specs,
+        base_dir=base_dir,
+        name=name,
+    ).setup()
+
     adapters, on_audio, stop_fn = run_streaming(
         provider_specs,
         base_dir=base_dir,
-        partial_callback=lambda name, text: tr_display.update_partial(name, text),
+        partial_callback=lambda pname, text: tr_display.update_partial(pname, text),
     )
 
     recorder = MicRecorder(
@@ -185,6 +207,7 @@ def _run_mic_mode(
             elapsed=recorder.elapsed, level=level, is_recording=True
         ),
         max_duration=max_duration,
+        gain=gain,
     )
 
     console.print("[bold]Recording from microphone.[/bold] Press Enter to stop.\n")
@@ -197,18 +220,19 @@ def _run_mic_mode(
             pass
         finally:
             recorder.stop()
+            # Save wav immediately so it's preserved even on Ctrl+C
+            wav_path = str(tr_run.input_dir / "mic_recording.wav")
+            recorder.save_wav(wav_path)
             tr_display.update_recording_status(0, 0, False)
 
     results = stop_fn()
 
-    # Save recording
-    if base_dir:
-        wav_path = str(base_dir / "mic_recording.wav")
-    else:
-        wav_path = "runs/mic_recording.wav"
-    recorder.save_wav(wav_path)
-    console.print(f"\n[dim]Recording saved: {wav_path}[/dim]")
+    # Save provider results into the run's output directory
+    for r in results:
+        output = result_to_verbose_json(r)
+        tr_run.save_result(r.provider_name, r.model_name, output)
 
+    console.print(f"\n[dim]Run: {tr_run.run_dir}[/dim]")
     for r in results:
         console.print(
             f"  [green]{r.provider_name}[/green] ({r.model_name}): "

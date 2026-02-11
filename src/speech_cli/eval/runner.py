@@ -24,6 +24,7 @@ def run_single(
     audio_file: str,
     provider_spec: str,
     base_dir: Optional[Path] = None,
+    run_name: Optional[str] = None,
 ) -> tuple[TranscriptionRun, TranscriptionResult]:
     """Run a single provider on an audio file.
 
@@ -31,6 +32,7 @@ def run_single(
         audio_file: Path to the audio file.
         provider_spec: Provider spec string (e.g. "whisper-cpp" or "whisper-cpp:model=/path").
         base_dir: Base directory for runs.
+        run_name: Optional name for the run directory.
 
     Returns:
         Tuple of (TranscriptionRun, TranscriptionResult).
@@ -43,6 +45,7 @@ def run_single(
         audio_file=audio_file,
         providers=[provider_spec],
         base_dir=base_dir,
+        name=run_name,
     ).setup()
 
     console.print(f"[blue]Running {provider.name} ({provider.model_name})...[/blue]")
@@ -69,6 +72,7 @@ def run_parallel(
     provider_specs: list[str],
     base_dir: Optional[Path] = None,
     display_callback=None,
+    run_name: Optional[str] = None,
 ) -> tuple[TranscriptionRun, list[TranscriptionResult]]:
     """Run multiple providers in parallel on an audio file.
 
@@ -77,6 +81,7 @@ def run_parallel(
         provider_specs: List of provider spec strings.
         base_dir: Base directory for runs.
         display_callback: Optional callback(provider_name, result) for live display.
+        run_name: Optional name for the run directory.
 
     Returns:
         Tuple of (TranscriptionRun, list of TranscriptionResults).
@@ -84,8 +89,8 @@ def run_parallel(
     # Instantiate and validate all providers first
     providers = []
     for spec in provider_specs:
-        name, config = parse_provider_spec(spec)
-        provider = get_provider(name, config)
+        pname, config = parse_provider_spec(spec)
+        provider = get_provider(pname, config)
         provider.validate_config()
         providers.append((spec, provider))
 
@@ -93,6 +98,7 @@ def run_parallel(
         audio_file=audio_file,
         providers=provider_specs,
         base_dir=base_dir,
+        name=run_name,
     ).setup()
 
     results = []

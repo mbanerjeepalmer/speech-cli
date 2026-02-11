@@ -27,10 +27,12 @@ class MicRecorder:
         on_audio: Optional[Callable[[bytes], None]] = None,
         level_callback: Optional[Callable[[float], None]] = None,
         max_duration: float = 300.0,
+        gain: float = 1.0,
     ) -> None:
         self._on_audio = on_audio
         self._level_callback = level_callback
         self._max_duration = max_duration
+        self._gain = gain
 
         self._buffer = bytearray()
         self._lock = threading.Lock()
@@ -43,6 +45,9 @@ class MicRecorder:
         """Called by sounddevice on each audio block."""
         if self._stop_event.is_set():
             return
+
+        if self._gain != 1.0:
+            indata = self._apply_gain(indata)
 
         with self._lock:
             self._buffer.extend(indata)
@@ -57,6 +62,17 @@ class MicRecorder:
         # Auto-stop on max duration
         if self._start_time is not None and (time.monotonic() - self._start_time) >= self._max_duration:
             self._stop_event.set()
+
+    def _apply_gain(self, data: bytes) -> bytes:
+        """Apply gain multiplier to PCM int16 data with clamping."""
+        n_samples = len(data) // 2
+        samples = struct.unpack(f"<{n_samples}h", data[:n_samples * 2])
+        gained = []
+        for s in samples:
+            v = int(s * self._gain)
+            v = max(-32768, min(32767, v))
+            gained.append(v)
+        return struct.pack(f"<{n_samples}h", *gained)
 
     @staticmethod
     def _compute_rms(data: bytes) -> float:

@@ -73,13 +73,12 @@ def test_transcribe_help():
     assert "audio" in result.stdout.lower()
 
 
-def test_transcribe_no_file_no_mic():
-    """Must provide either audio_file or --mic."""
-    result = runner.invoke(_test_app, ["transcribe", "--mic", "false"])
-    # With no audio_file and no --mic, should fail
-    # Actually, typer makes audio_file optional now, so test explicit case
+@patch("speech_cli.eval.cli_eval._run_mic_mode")
+def test_transcribe_no_file_defaults_to_mic(mock_mic_mode):
+    """No audio file defaults to mic mode."""
     result = runner.invoke(_test_app, ["transcribe"])
-    assert result.exit_code != 0
+    assert result.exit_code == 0
+    mock_mic_mode.assert_called_once()
 
 
 def test_transcribe_mic_and_file():
