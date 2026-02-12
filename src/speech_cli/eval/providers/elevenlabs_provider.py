@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import logging
 import os
 import threading
 import time
@@ -12,6 +13,8 @@ from speech_cli.eval.providers.base import (
     TranscriptionResult,
     TranscriptionSegment,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ElevenLabsProvider(StreamingTranscriptionProvider):
@@ -42,6 +45,8 @@ class ElevenLabsProvider(StreamingTranscriptionProvider):
         self._start_time: Optional[float] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
+        self._error: Optional[str] = None
+        self._chunks_sent = 0
 
     def validate_config(self) -> None:
         if not self.api_key:
@@ -53,7 +58,7 @@ class ElevenLabsProvider(StreamingTranscriptionProvider):
     def supports_diarization(self) -> bool:
         return True
 
-    # -- Batch transcription (unchanged) --
+    # -- Batch transcription --
 
     def transcribe_file(self, path: str) -> TranscriptionResult:
         from elevenlabs import ElevenLabs
@@ -109,6 +114,8 @@ class ElevenLabsProvider(StreamingTranscriptionProvider):
     def start_streaming(self) -> None:
         self._committed_text = ""
         self._partial_text = ""
+        self._error = None
+        self._chunks_sent = 0
         self._start_time = time.monotonic()
 
         self._loop = asyncio.new_event_loop()
@@ -142,52 +149,73 @@ class ElevenLabsProvider(StreamingTranscriptionProvider):
         if self.language:
             options["language_code"] = self.language
 
+        logger.debug("connecting to ElevenLabs realtime (model=%s)", self.STREAMING_MODEL)
         self._connection = await client.speech_to_text.realtime.connect(options)
+        logger.info("WebSocket connected")
 
+        self._connection.on("session_started", self._on_session_started)
         self._connection.on("partial_transcript", self._on_partial_transcript)
         self._connection.on("committed_transcript", self._on_committed_transcript)
+        self._connection.on("error", self._on_error)
+        self._connection.on("close", self._on_close)
+
+    def _on_session_started(self, data=None) -> None:
+        logger.info("session started")
 
     def _on_partial_transcript(self, data) -> None:
-        transcript = data.get("transcript", "") if isinstance(data, dict) else ""
+        transcript = data.get("text", "") if isinstance(data, dict) else ""
         self._partial_text = transcript
         full_text = (self._committed_text + " " + transcript).strip()
+        logger.debug("partial: %r", transcript[:80] if transcript else "")
         if self._partial_callback:
             self._partial_callback(full_text)
 
     def _on_committed_transcript(self, data) -> None:
-        transcript = data.get("transcript", "") if isinstance(data, dict) else ""
+        transcript = data.get("text", "") if isinstance(data, dict) else ""
         if self._committed_text:
             self._committed_text += " " + transcript
         else:
             self._committed_text = transcript
         self._partial_text = ""
+        logger.info("committed: %r", transcript[:80] if transcript else "")
         if self._partial_callback:
             self._partial_callback(self._committed_text)
 
+    def _on_error(self, data=None) -> None:
+        msg = data.get("error", str(data)) if isinstance(data, dict) else str(data)
+        logger.error("WS error: %s", msg)
+        self._error = msg
+        if self._partial_callback:
+            self._partial_callback(f"[error: {msg}]")
+
+    def _on_close(self, data=None) -> None:
+        logger.info("WebSocket closed (chunks_sent=%d)", self._chunks_sent)
+
     def send_audio(self, chunk: bytes) -> None:
-        if self._connection and self._loop:
+        if self._connection and self._loop and not self._loop.is_closed():
             b64 = base64.b64encode(chunk).decode("utf-8")
             asyncio.run_coroutine_threadsafe(
                 self._connection.send({"audio_base_64": b64}),
                 self._loop,
             )
+            self._chunks_sent += 1
+            if self._chunks_sent == 1:
+                logger.info("first audio chunk sent (%d bytes)", len(chunk))
 
     def stop_streaming(self) -> TranscriptionResult:
         elapsed = time.monotonic() - self._start_time if self._start_time else None
+        logger.info("stopping (chunks_sent=%d)", self._chunks_sent)
 
-        if self._connection and self._loop:
+        if self._connection and self._loop and not self._loop.is_closed():
             try:
                 future = asyncio.run_coroutine_threadsafe(
-                    self._connection.commit(), self._loop
+                    self._connection.close(), self._loop
                 )
                 future.result(timeout=5)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error("error closing connection: %s", e)
 
-            # Give a moment for final events
-            time.sleep(0.5)
-
-        if self._loop:
+        if self._loop and not self._loop.is_closed():
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread:
             self._thread.join(timeout=5)
@@ -200,6 +228,7 @@ class ElevenLabsProvider(StreamingTranscriptionProvider):
         if self._partial_text:
             final_text = (final_text + " " + self._partial_text).strip()
 
+        logger.info("final text: %d chars", len(final_text))
         return TranscriptionResult(
             provider_name=self.name,
             model_name=self.STREAMING_MODEL,

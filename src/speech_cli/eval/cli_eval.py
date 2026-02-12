@@ -1,6 +1,7 @@
 """CLI commands for multi-provider transcription."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -195,6 +196,16 @@ def _run_mic_mode(
         name=name,
     ).setup()
 
+    # Set up file logging for streaming diagnostics
+    log_path = tr_run.run_dir / "streaming.log"
+    _stream_log_handler = logging.FileHandler(log_path)
+    _stream_log_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(name)s %(levelname)s  %(message)s", datefmt="%H:%M:%S")
+    )
+    stream_logger = logging.getLogger("speech_cli.eval")
+    stream_logger.addHandler(_stream_log_handler)
+    stream_logger.setLevel(logging.DEBUG)
+
     adapters, on_audio, stop_fn = run_streaming(
         provider_specs,
         base_dir=base_dir,
@@ -231,6 +242,10 @@ def _run_mic_mode(
     for r in results:
         output = result_to_verbose_json(r)
         tr_run.save_result(r.provider_name, r.model_name, output)
+
+    # Tear down file logging
+    stream_logger.removeHandler(_stream_log_handler)
+    _stream_log_handler.close()
 
     console.print(f"\n[dim]Run: {tr_run.run_dir}[/dim]")
     for r in results:

@@ -1,12 +1,15 @@
 """Mistral transcription provider (Voxtral)."""
 
 import asyncio
+import logging
 import os
 import threading
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 from speech_cli.eval.providers.base import (
     StreamingTranscriptionProvider,
@@ -109,6 +112,7 @@ class MistralProvider(StreamingTranscriptionProvider):
 
     def start_streaming(self) -> None:
         self._accumulated_text = ""
+        self._chunks_sent = 0
         self._start_time = time.monotonic()
 
         self._loop = asyncio.new_event_loop()
@@ -119,10 +123,12 @@ class MistralProvider(StreamingTranscriptionProvider):
         self._thread.start()
 
         # Start the stream consumer task
+        logger.debug("connecting to Mistral realtime (model=%s)", STREAMING_MODEL)
         future = asyncio.run_coroutine_threadsafe(
             self._start_stream(), self._loop
         )
         future.result(timeout=10)
+        logger.info("Mistral streaming started")
 
     def _run_event_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -159,21 +165,26 @@ class MistralProvider(StreamingTranscriptionProvider):
             ):
                 if isinstance(event, TranscriptionStreamTextDelta):
                     self._accumulated_text += event.text
+                    logger.debug("text_delta: %r", event.text)
                     if self._partial_callback:
                         self._partial_callback(self._accumulated_text)
                 elif isinstance(event, RealtimeTranscriptionError):
-                    pass  # Don't crash on streaming errors
+                    logger.error("stream error: %s", event)
         except asyncio.CancelledError:
-            pass
-        except Exception:
-            pass  # Don't crash streaming on connection errors
+            logger.debug("stream cancelled")
+        except Exception as e:
+            logger.error("stream exception: %s", e, exc_info=True)
 
     def send_audio(self, chunk: bytes) -> None:
         if self._audio_queue and self._loop:
             self._loop.call_soon_threadsafe(self._audio_queue.put_nowait, chunk)
+            self._chunks_sent += 1
+            if self._chunks_sent == 1:
+                logger.info("first audio chunk sent (%d bytes)", len(chunk))
 
     def stop_streaming(self) -> TranscriptionResult:
         elapsed = time.monotonic() - self._start_time if self._start_time else None
+        logger.info("stop_streaming called (chunks_sent=%d)", self._chunks_sent)
 
         # Signal end of audio
         if self._audio_queue and self._loop:
@@ -187,8 +198,8 @@ class MistralProvider(StreamingTranscriptionProvider):
 
                 future = asyncio.run_coroutine_threadsafe(_wait(), self._loop)
                 future.result(timeout=10)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error("error waiting for stream: %s", e)
 
         if self._loop:
             self._loop.call_soon_threadsafe(self._loop.stop)
@@ -200,6 +211,7 @@ class MistralProvider(StreamingTranscriptionProvider):
         self._audio_queue = None
         self._stream_task = None
 
+        logger.info("final text: %r", self._accumulated_text[:200] if self._accumulated_text else "")
         return TranscriptionResult(
             provider_name=self.name,
             model_name=STREAMING_MODEL,

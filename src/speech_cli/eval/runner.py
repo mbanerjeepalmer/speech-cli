@@ -1,11 +1,14 @@
 """Transcription runner: orchestrates providers, display, and storage."""
 
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
+
+logger = logging.getLogger(__name__)
 
 from speech_cli.eval.audio.chunked_adapter import ChunkedStreamingAdapter
 from speech_cli.eval.audio.convert import convert_to_wav_16k, is_wav_16k
@@ -175,13 +178,17 @@ def run_streaming(
 
         if isinstance(provider, StreamingTranscriptionProvider):
             adapter = provider
+            logger.info("[%s] native streaming provider", name)
         else:
             adapter = ChunkedStreamingAdapter(provider)
+            logger.info("[%s] batch provider via ChunkedStreamingAdapter", name)
 
         if partial_callback:
             adapter.on_partial(lambda text, n=name: partial_callback(n, text))
 
+        logger.info("[%s] starting streaming", name)
         adapter.start_streaming()
+        logger.info("[%s] streaming started", name)
         adapters.append((spec, adapter))
 
     def on_audio(chunk: bytes) -> None:
@@ -191,10 +198,14 @@ def run_streaming(
     def stop() -> list[TranscriptionResult]:
         results = []
         for spec, adapter in adapters:
+            name = spec.split(":")[0]
+            logger.info("[%s] stopping streaming", name)
             try:
                 result = adapter.stop_streaming()
+                logger.info("[%s] stopped, text=%d chars", name, len(result.text))
                 results.append(result)
             except Exception as e:
+                logger.error("[%s] stop failed: %s", name, e, exc_info=True)
                 console.print(f"[red]{spec} stop failed:[/red] {e}")
         return results
 

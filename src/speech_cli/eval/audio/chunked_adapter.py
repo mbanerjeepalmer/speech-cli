@@ -1,10 +1,13 @@
 """Chunked streaming adapter for batch-only transcription providers."""
 
+import logging
 import tempfile
 import threading
 import time
 import wave
 from typing import Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 from speech_cli.eval.providers.base import (
     TranscriptionProvider,
@@ -105,14 +108,17 @@ class ChunkedStreamingAdapter:
                     return
                 audio_data = bytes(self._buffer)
 
+            dur = len(audio_data) / (self.SAMPLE_RATE * 2)
+            logger.debug("[%s] flush: %.1fs audio", self._provider.name, dur)
             wav_path = self._write_temp_wav(audio_data)
             try:
                 result = self._provider.transcribe_file(wav_path)
                 self._accumulated_text = result.text
+                logger.debug("[%s] flush result: %r", self._provider.name, result.text[:100] if result.text else "")
                 if self._partial_callback:
                     self._partial_callback(result.text)
-            except Exception:
-                pass  # Don't crash streaming on transcription errors
+            except Exception as e:
+                logger.error("[%s] flush error: %s", self._provider.name, e, exc_info=True)
         finally:
             self._flushing = False
 
