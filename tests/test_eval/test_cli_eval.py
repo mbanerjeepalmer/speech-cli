@@ -15,8 +15,8 @@ register_commands(_test_app)
 runner = CliRunner()
 
 
-def test_list_providers():
-    result = runner.invoke(_test_app, ["list-providers"])
+def test_providers():
+    result = runner.invoke(_test_app, ["providers"])
     assert result.exit_code == 0
     assert "whisper-cpp" in result.stdout
 

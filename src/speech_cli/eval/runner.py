@@ -37,6 +37,7 @@ def run_single(
     provider_spec: str,
     base_dir: Optional[Path] = None,
     run_name: Optional[str] = None,
+    extra_config: Optional[dict] = None,
 ) -> tuple[TranscriptionRun, TranscriptionResult]:
     """Run a single provider on an audio file.
 
@@ -45,11 +46,14 @@ def run_single(
         provider_spec: Provider spec string (e.g. "whisper-cpp" or "whisper-cpp:model=/path").
         base_dir: Base directory for runs.
         run_name: Optional name for the run directory.
+        extra_config: Extra config (language, diarize) merged into provider config.
 
     Returns:
         Tuple of (TranscriptionRun, TranscriptionResult).
     """
     name, config = parse_provider_spec(provider_spec)
+    if extra_config:
+        config = {**config, **extra_config}
     provider = get_provider(name, config)
     provider.validate_config()
 
@@ -87,6 +91,7 @@ def run_parallel(
     base_dir: Optional[Path] = None,
     display_callback=None,
     run_name: Optional[str] = None,
+    extra_config: Optional[dict] = None,
 ) -> tuple[TranscriptionRun, list[TranscriptionResult]]:
     """Run multiple providers in parallel on an audio file.
 
@@ -96,6 +101,7 @@ def run_parallel(
         base_dir: Base directory for runs.
         display_callback: Optional callback(provider_name, result) for live display.
         run_name: Optional name for the run directory.
+        extra_config: Extra config (language, diarize) merged into provider config.
 
     Returns:
         Tuple of (TranscriptionRun, list of TranscriptionResults).
@@ -104,6 +110,8 @@ def run_parallel(
     providers = []
     for spec in provider_specs:
         pname, config = parse_provider_spec(spec)
+        if extra_config:
+            config = {**config, **extra_config}
         provider = get_provider(pname, config)
         provider.validate_config()
         providers.append((spec, provider))
@@ -156,6 +164,7 @@ def run_streaming(
     provider_specs: list[str],
     base_dir: Optional[Path] = None,
     partial_callback=None,
+    extra_config: Optional[dict] = None,
 ) -> tuple[list, "Callable[[bytes], None]", "Callable[[], list[TranscriptionResult]]"]:
     """Set up streaming providers and return audio sink + stop function.
 
@@ -163,6 +172,7 @@ def run_streaming(
         provider_specs: List of provider spec strings.
         base_dir: Base directory for runs.
         partial_callback: Optional callback(provider_name, text) for partial updates.
+        extra_config: Extra config (language, diarize) merged into provider config.
 
     Returns:
         Tuple of (streaming_adapters, on_audio_fn, stop_fn).
@@ -173,6 +183,8 @@ def run_streaming(
     adapters = []
     for spec in provider_specs:
         name, config = parse_provider_spec(spec)
+        if extra_config:
+            config = {**config, **extra_config}
         provider = get_provider(name, config)
         provider.validate_config()
 

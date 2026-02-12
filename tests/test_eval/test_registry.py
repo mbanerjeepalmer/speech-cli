@@ -53,10 +53,10 @@ def test_parse_provider_spec_with_params():
 
 
 def test_parse_provider_spec_boolean_false():
-    _, config = parse_provider_spec("test:flag=false")
+    _, config = parse_provider_spec("groq:flag=false")
     assert config["flag"] is False
 
 
 def test_parse_provider_spec_bare_flag():
-    _, config = parse_provider_spec("test:verbose")
+    _, config = parse_provider_spec("groq:verbose")
     assert config["verbose"] is True

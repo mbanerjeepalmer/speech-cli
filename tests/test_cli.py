@@ -19,12 +19,13 @@ def test_cli_help():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "transcribe" in result.stdout.lower()
-    assert "list-providers" in result.stdout.lower()
+    assert "providers" in result.stdout.lower()
+    assert "models" in result.stdout.lower()
     assert "show" in result.stdout.lower()
 
 
-def test_list_providers():
-    """Test list-providers from top level."""
-    result = runner.invoke(app, ["list-providers"])
+def test_providers():
+    """Test providers command from top level."""
+    result = runner.invoke(app, ["providers"])
     assert result.exit_code == 0
     assert "whisper-cpp" in result.stdout

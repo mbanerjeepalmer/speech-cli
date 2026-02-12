@@ -1,6 +1,6 @@
 """Constants and configuration values for speech-cli."""
 
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import Final
 
 
@@ -14,6 +14,54 @@ class ExitCode(IntEnum):
     API_ERROR = 4
     NETWORK_ERROR = 5
     FILE_ERROR = 6
+
+
+class Provider(str, Enum):
+    """Supported transcription providers."""
+
+    WHISPER_CPP = "whisper-cpp"
+    ELEVENLABS = "elevenlabs"
+    GROQ = "groq"
+    MISTRAL = "mistral"
+    HUGGINGFACE = "huggingface"
+
+
+PROVIDER_MODELS: Final[dict[Provider, list[str]]] = {
+    Provider.WHISPER_CPP: [
+        "ggml-tiny.en",
+        "ggml-base.en",
+        "ggml-small.en",
+        "ggml-medium.en",
+        "ggml-large",
+    ],
+    Provider.ELEVENLABS: ["scribe_v1", "scribe_v2", "scribe_v2_realtime"],
+    Provider.GROQ: ["whisper-large-v3", "whisper-large-v3-turbo"],
+    Provider.MISTRAL: [
+        "voxtral-mini-latest",
+        "voxtral-mini-transcribe-realtime-2602",
+    ],
+    Provider.HUGGINGFACE: [
+        "openai/whisper-large-v3-turbo",
+        "openai/whisper-large-v3",
+    ],
+}
+
+DEFAULT_MODELS: Final[dict[Provider, str]] = {
+    Provider.WHISPER_CPP: "ggml-tiny.en",
+    Provider.ELEVENLABS: "scribe_v1",
+    Provider.GROQ: "whisper-large-v3-turbo",
+    Provider.MISTRAL: "voxtral-mini-latest",
+    Provider.HUGGINGFACE: "openai/whisper-large-v3-turbo",
+}
+
+
+class OutputFormat(str, Enum):
+    """Supported output formats."""
+
+    TEXT = "text"
+    JSON = "json"
+    SRT = "srt"
+    VTT = "vtt"
 
 
 # Supported output formats

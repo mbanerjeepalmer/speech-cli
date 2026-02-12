@@ -1,5 +1,6 @@
 """Rich Live TUI for side-by-side transcription display."""
 
+import math
 import threading
 from typing import Optional
 
@@ -88,9 +89,10 @@ class TranscriptionDisplay:
         mins, secs = divmod(int(self._rec_elapsed), 60)
         time_str = f"{mins:02d}:{secs:02d}"
 
-        # Simple level bar using block characters
+        # sqrt-scaled level bar so it responds to normal speech levels
         bar_width = 20
-        filled = int(self._rec_level * bar_width)
+        scaled = math.sqrt(min(self._rec_level * 5.0, 1.0))
+        filled = int(scaled * bar_width)
         bar = "\u2588" * filled + "\u2591" * (bar_width - filled)
 
         return Text.from_markup(
