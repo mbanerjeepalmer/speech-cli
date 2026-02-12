@@ -17,8 +17,9 @@ MOCK_RESULT = TranscriptionResult(
 )
 
 
+@patch("speech_cli.eval.runner._ensure_wav_16k", side_effect=lambda f: f)
 @patch("speech_cli.eval.runner.get_provider")
-def test_run_single(mock_get_provider, tmp_path):
+def test_run_single(mock_get_provider, mock_ensure, tmp_path):
     # Setup
     audio = tmp_path / "test.wav"
     audio.write_bytes(b"fake audio")
@@ -39,8 +40,9 @@ def test_run_single(mock_get_provider, tmp_path):
     mock_provider.transcribe_file.assert_called_once_with(str(audio))
 
 
+@patch("speech_cli.eval.runner._ensure_wav_16k", side_effect=lambda f: f)
 @patch("speech_cli.eval.runner.get_provider")
-def test_run_parallel_multiple(mock_get_provider, tmp_path):
+def test_run_parallel_multiple(mock_get_provider, mock_ensure, tmp_path):
     audio = tmp_path / "test.wav"
     audio.write_bytes(b"fake audio")
 
@@ -78,8 +80,9 @@ def test_run_parallel_multiple(mock_get_provider, tmp_path):
     assert "text2" in texts
 
 
+@patch("speech_cli.eval.runner._ensure_wav_16k", side_effect=lambda f: f)
 @patch("speech_cli.eval.runner.get_provider")
-def test_run_parallel_with_callback(mock_get_provider, tmp_path):
+def test_run_parallel_with_callback(mock_get_provider, mock_ensure, tmp_path):
     audio = tmp_path / "test.wav"
     audio.write_bytes(b"fake audio")
 
@@ -103,8 +106,9 @@ def test_run_parallel_with_callback(mock_get_provider, tmp_path):
     callback.assert_called_once()
 
 
+@patch("speech_cli.eval.runner._ensure_wav_16k", side_effect=lambda f: f)
 @patch("speech_cli.eval.runner.get_provider")
-def test_run_parallel_provider_failure(mock_get_provider, tmp_path):
+def test_run_parallel_provider_failure(mock_get_provider, mock_ensure, tmp_path):
     audio = tmp_path / "test.wav"
     audio.write_bytes(b"fake audio")
 

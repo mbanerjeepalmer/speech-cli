@@ -8,6 +8,7 @@ from typing import Optional
 from rich.console import Console
 
 from speech_cli.eval.audio.chunked_adapter import ChunkedStreamingAdapter
+from speech_cli.eval.audio.convert import convert_to_wav_16k, is_wav_16k
 from speech_cli.eval.providers.base import (
     StreamingTranscriptionProvider,
     TranscriptionProvider,
@@ -18,6 +19,14 @@ from speech_cli.eval.storage.eval_run import TranscriptionRun
 from speech_cli.eval.storage.formats import result_to_verbose_json
 
 console = Console(stderr=True)
+
+
+def _ensure_wav_16k(audio_file: str) -> str:
+    """Convert audio to WAV 16kHz mono if needed."""
+    if is_wav_16k(audio_file):
+        return audio_file
+    console.print("[dim]Converting audio to WAV 16kHz mono...[/dim]")
+    return convert_to_wav_16k(audio_file)
 
 
 def run_single(
@@ -41,6 +50,8 @@ def run_single(
     provider = get_provider(name, config)
     provider.validate_config()
 
+    wav_file = _ensure_wav_16k(audio_file)
+
     tr_run = TranscriptionRun(
         audio_file=audio_file,
         providers=[provider_spec],
@@ -49,7 +60,7 @@ def run_single(
     ).setup()
 
     console.print(f"[blue]Running {provider.name} ({provider.model_name})...[/blue]")
-    result = provider.transcribe_file(audio_file)
+    result = provider.transcribe_file(wav_file)
 
     # Save result
     output = result_to_verbose_json(result)
@@ -94,6 +105,8 @@ def run_parallel(
         provider.validate_config()
         providers.append((spec, provider))
 
+    wav_file = _ensure_wav_16k(audio_file)
+
     tr_run = TranscriptionRun(
         audio_file=audio_file,
         providers=provider_specs,
@@ -105,7 +118,7 @@ def run_parallel(
     with ThreadPoolExecutor(max_workers=len(providers)) as executor:
         future_to_spec = {}
         for spec, provider in providers:
-            future = executor.submit(_run_provider, provider, audio_file)
+            future = executor.submit(_run_provider, provider, wav_file)
             future_to_spec[future] = (spec, provider)
 
         for future in as_completed(future_to_spec):

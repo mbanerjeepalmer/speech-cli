@@ -3,6 +3,7 @@
 from typing import Optional
 
 import typer
+from dotenv import load_dotenv
 from rich.console import Console
 
 from speech_cli import __version__
@@ -36,6 +37,7 @@ def main(
     ),
 ) -> None:
     """Speech-to-text CLI with multi-provider support."""
+    load_dotenv()
 
 
 register_commands(app)

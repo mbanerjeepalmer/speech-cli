@@ -2,6 +2,7 @@
 
 import os
 import time
+from pathlib import Path
 from typing import Optional
 
 from speech_cli.eval.providers.base import (
@@ -17,7 +18,7 @@ class MistralProvider(TranscriptionProvider):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "mistral-small-latest",
+        model: str = "voxtral-mini-latest",
         language: Optional[str] = None,
     ) -> None:
         self.api_key = api_key or os.environ.get("MISTRAL_API_KEY")
@@ -40,65 +41,43 @@ class MistralProvider(TranscriptionProvider):
             )
 
     def transcribe_file(self, path: str) -> TranscriptionResult:
-        import base64
-
         from mistralai import Mistral
 
         client = Mistral(api_key=self.api_key)
 
-        # Mistral uses multimodal chat with audio encoded as base64 data URL
-        with open(path, "rb") as f:
-            audio_data = f.read()
-
-        b64 = base64.b64encode(audio_data).decode("utf-8")
-        # Determine mime type from extension
-        ext = path.rsplit(".", 1)[-1].lower() if "." in path else "wav"
-        mime_map = {"wav": "audio/wav", "mp3": "audio/mpeg", "m4a": "audio/mp4", "webm": "audio/webm"}
-        mime = mime_map.get(ext, "audio/wav")
-
-        prompt = "Transcribe this audio."
-        if self.language:
-            prompt += f" The audio is in {self.language}."
+        file_name = Path(path).name
 
         start = time.monotonic()
-        response = client.chat.complete(
-            model=self.model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "audio_url",
-                            "audio_url": f"data:{mime};base64,{b64}",
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt,
-                        },
-                    ],
-                }
-            ],
-        )
+        with open(path, "rb") as f:
+            response = client.audio.transcriptions.complete(
+                model=self.model,
+                file={"content": f, "file_name": file_name},
+                timestamp_granularities=["segment"],
+            )
         elapsed = time.monotonic() - start
 
-        # Extract text from chat response
-        text = ""
+        text = response.text or ""
+        segments = []
+        if response.segments:
+            for seg in response.segments:
+                segments.append(
+                    TranscriptionSegment(
+                        text=seg.text,
+                        start=seg.start,
+                        end=seg.end,
+                    )
+                )
+
         raw = {}
         if hasattr(response, "model_dump"):
             raw = response.model_dump()
-        elif isinstance(response, dict):
-            raw = response
-
-        choices = raw.get("choices", [])
-        if choices:
-            text = choices[0].get("message", {}).get("content", "")
 
         return TranscriptionResult(
             provider_name=self.name,
             model_name=self.model_name,
             text=text,
-            segments=[],
-            language=self.language,
+            segments=segments,
+            language=self.language or getattr(response, "language", None),
             processing_time_seconds=round(elapsed, 3),
             raw_response=raw,
         )

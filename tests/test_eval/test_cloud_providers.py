@@ -118,14 +118,22 @@ class TestMistralProvider:
         audio = tmp_path / "test.wav"
         audio.write_bytes(b"fake")
 
+        mock_segment = MagicMock()
+        mock_segment.text = "hello from mistral"
+        mock_segment.start = 0.0
+        mock_segment.end = 2.0
+
         mock_response = MagicMock()
+        mock_response.text = "hello from mistral"
+        mock_response.segments = [mock_segment]
+        mock_response.language = "en"
         mock_response.model_dump.return_value = {
-            "choices": [
-                {"message": {"content": "hello from mistral"}}
-            ],
+            "text": "hello from mistral",
+            "segments": [{"text": "hello from mistral", "start": 0.0, "end": 2.0}],
+            "language": "en",
         }
         mock_client_instance = MagicMock()
-        mock_client_instance.chat.complete.return_value = mock_response
+        mock_client_instance.audio.transcriptions.complete.return_value = mock_response
 
         fake_mistralai = ModuleType("mistralai")
         fake_mistralai.Mistral = MagicMock(return_value=mock_client_instance)
@@ -137,6 +145,8 @@ class TestMistralProvider:
             result = p.transcribe_file(str(audio))
 
         assert result.text == "hello from mistral"
+        assert len(result.segments) == 1
+        assert result.segments[0].start == 0.0
 
 
 class TestHuggingFaceProvider:
