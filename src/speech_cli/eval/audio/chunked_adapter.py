@@ -18,6 +18,9 @@ class ChunkedStreamingAdapter:
     Accumulates audio chunks. Every `chunk_interval` seconds, writes
     accumulated audio to a temp WAV, calls provider.transcribe_file(),
     and fires the partial callback with the result text.
+
+    Flushes run in a background thread so send_audio() never blocks the
+    audio callback, which would starve other streaming providers.
     """
 
     SAMPLE_RATE = 16000
@@ -38,6 +41,8 @@ class ChunkedStreamingAdapter:
         self._last_flush_time: Optional[float] = None
         self._accumulated_text = ""
         self._stop_event = threading.Event()
+        self._flushing = False  # guard against overlapping flushes
+        self._flush_thread: Optional[threading.Thread] = None
 
     @property
     def name(self) -> str:
@@ -56,17 +61,31 @@ class ChunkedStreamingAdapter:
         self._start_time = time.monotonic()
         self._last_flush_time = self._start_time
         self._stop_event.clear()
+        self._flushing = False
+        self._flush_thread = None
 
     def send_audio(self, chunk: bytes) -> None:
         with self._lock:
             self._buffer.extend(chunk)
 
         now = time.monotonic()
-        if self._last_flush_time and (now - self._last_flush_time) >= self._chunk_interval:
-            self._flush()
+        if (
+            self._last_flush_time
+            and (now - self._last_flush_time) >= self._chunk_interval
+            and not self._flushing
+        ):
+            self._last_flush_time = now
+            self._flush_thread = threading.Thread(
+                target=self._flush, daemon=True
+            )
+            self._flush_thread.start()
 
     def stop_streaming(self) -> TranscriptionResult:
         self._stop_event.set()
+        # Wait for any in-flight background flush
+        if self._flush_thread:
+            self._flush_thread.join(timeout=30)
+        # Final synchronous flush of remaining audio
         self._flush()
         return TranscriptionResult(
             provider_name=self._provider.name,
@@ -79,21 +98,23 @@ class ChunkedStreamingAdapter:
 
     def _flush(self) -> None:
         """Write buffered audio to temp WAV and transcribe."""
-        with self._lock:
-            if not self._buffer:
-                return
-            audio_data = bytes(self._buffer)
-
-        self._last_flush_time = time.monotonic()
-
-        wav_path = self._write_temp_wav(audio_data)
+        self._flushing = True
         try:
-            result = self._provider.transcribe_file(wav_path)
-            self._accumulated_text = result.text
-            if self._partial_callback:
-                self._partial_callback(result.text)
-        except Exception:
-            pass  # Don't crash streaming on transcription errors
+            with self._lock:
+                if not self._buffer:
+                    return
+                audio_data = bytes(self._buffer)
+
+            wav_path = self._write_temp_wav(audio_data)
+            try:
+                result = self._provider.transcribe_file(wav_path)
+                self._accumulated_text = result.text
+                if self._partial_callback:
+                    self._partial_callback(result.text)
+            except Exception:
+                pass  # Don't crash streaming on transcription errors
+        finally:
+            self._flushing = False
 
     @staticmethod
     def _write_temp_wav(audio_data: bytes) -> str:

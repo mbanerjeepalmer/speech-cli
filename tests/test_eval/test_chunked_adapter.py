@@ -58,7 +58,10 @@ def test_flush_on_interval():
     chunk = _make_pcm_chunk()
     adapter.send_audio(chunk)
 
-    # With interval=0, should flush immediately
+    # Flush runs in a background thread; wait for it
+    if adapter._flush_thread:
+        adapter._flush_thread.join(timeout=5)
+
     provider.transcribe_file.assert_called_once()
     assert partials == ["partial result"]
 
@@ -105,6 +108,10 @@ def test_transcription_error_does_not_crash():
     chunk = _make_pcm_chunk()
     adapter.send_audio(chunk)  # Should not raise
 
+    # Wait for background flush thread to complete
+    if adapter._flush_thread:
+        adapter._flush_thread.join(timeout=5)
+
     result = adapter.stop_streaming()
     assert result.text == ""  # No successful transcription
 
@@ -119,11 +126,17 @@ def test_accumulated_text_updates():
         provider_name="test", model_name="m", text="hello"
     )
     adapter.send_audio(_make_pcm_chunk())
+    # Wait for background flush
+    if adapter._flush_thread:
+        adapter._flush_thread.join(timeout=5)
 
     provider.transcribe_file.return_value = TranscriptionResult(
         provider_name="test", model_name="m", text="hello world"
     )
     adapter.send_audio(_make_pcm_chunk())
+    # Wait for background flush
+    if adapter._flush_thread:
+        adapter._flush_thread.join(timeout=5)
 
     result = adapter.stop_streaming()
     # Final flush re-transcribes everything
